@@ -147,7 +147,7 @@ async def main():
 
     async with aiohttp.ClientSession(headers=HEADERS) as session:
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-        current_revision = 7723
+        current_revision = 10172
         # todo - load state
 
         with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -206,9 +206,9 @@ async def main():
             print(
                 f"Background: {'WHITE (black dots)' if frame['white_bg'] else 'BLACK (white dots)'}"
             )
-            # print("-" * data["width"])
-            # print(frame["braille"])
-            # print("-" * data["width"])
+            print("-" * data["width"])
+            print(frame["braille"])
+            print("-" * data["width"])
 
             raw_command = make_raw_data(current_revision, command, reqId=index)
             async with session.post(
