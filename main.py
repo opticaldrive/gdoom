@@ -160,6 +160,9 @@ async def main():
 
         timestamp = index / data["fps"]
 
+        STEP = 10
+        delay = STEP / data["fps"]  # 10/30 = 0.333
+
         while True:
             # text = "a" * 5000
             frame = frames[index]
@@ -203,9 +206,9 @@ async def main():
             print(
                 f"Background: {'WHITE (black dots)' if frame['white_bg'] else 'BLACK (white dots)'}"
             )
-            print("-" * data["width"])
-            print(frame["braille"])
-            print("-" * data["width"])
+            # print("-" * data["width"])
+            # print(frame["braille"])
+            # print("-" * data["width"])
 
             raw_command = make_raw_data(current_revision, command, reqId=index)
             async with session.post(
@@ -214,7 +217,10 @@ async def main():
                 print("Status:", response.status)
                 print("Content-type:", response.headers["content-type"])
                 body = await response.text()
+                print(response.headers)
 
+                if response.status == "401":
+                    exit
                 if body.startswith(")]}'"):
                     clean_json = body.lstrip(")]}'\n ")
                 else:
@@ -227,9 +233,10 @@ async def main():
                 print(
                     body
                 )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(delay)
             current_revision += 1
-            index += 5
+            index += STEP
+
             if index >= total_frames:
                 index = 0
 
