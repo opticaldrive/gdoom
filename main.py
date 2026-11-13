@@ -18,6 +18,46 @@ SID = params["sid"][0]
 # print(GDOC_URL)  # gdoc url is stable across allrequests i've tried, seems obvious
 # cookie  isn't stable between requets, but we just hope it works.
 
+STATE_PATH = "state.json"  # im tired of hardocing revisions :p
+# ton of copy pastintg snippets sorry
+
+
+def save_state(index, rev):
+    with open(STATE_PATH, "w") as f:
+        json.dump({"index": index, "revision": rev}, f)
+
+
+def load_state():
+    try:
+        with open(STATE_PATH) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+import hashlib, time
+
+ORIGIN = f"{urlparse(GDOC_URL).scheme}://{urlparse(GDOC_URL).netloc}"  # idk why not just hardcpde
+
+
+def _cookie(name):
+    raw = HEADERS.get("cookie") or HEADERS.get("Cookie") or ""
+    for part in raw.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k == name:
+            return v
+    return None
+
+
+SAPISID = _cookie("SAPISID")
+assert SAPISID, "SAPISID cookie not found in HEADERS"
+
+
+def sapisidhash(ts=None):
+    ts = ts or int(time.time())
+    digest = hashlib.sha1(f"{ts} {SAPISID} {ORIGIN}".encode()).hexdigest()
+    return f"SAPISIDHASH {ts}_{digest}"
+
 
 def make_raw_data(rev, commands, gdoc_url=GDOC_URL, sid=SID, reqId=1):
     # rev=24&bundles=[{"commands":[{"ty":"ds","si":4,"ei":5}],"sid":"","reqId":3}]
@@ -107,7 +147,8 @@ async def main():
 
     async with aiohttp.ClientSession(headers=HEADERS) as session:
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-        current_revision = 1589
+        current_revision = 7723
+        # todo - load state
 
         with open(JSON_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -167,8 +208,9 @@ async def main():
             print("-" * data["width"])
 
             raw_command = make_raw_data(current_revision, command, reqId=index)
-            async with session.post(GDOC_URL, data=raw_command) as response:
-
+            async with session.post(
+                GDOC_URL, data=raw_command, headers={"authorization": sapisidhash()}
+            ) as response:
                 print("Status:", response.status)
                 print("Content-type:", response.headers["content-type"])
                 body = await response.text()
@@ -181,12 +223,13 @@ async def main():
                 cleaner_response = json.loads(clean_json)
                 if response.status == 200:
                     next_rev = cleaner_response["revisionRanges"][0][1]
+                    save_state(index, current_revision)
                 print(
                     body
                 )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
             current_revision += 1
-            index += 10
+            index += 5
             if index >= total_frames:
                 index = 0
 
