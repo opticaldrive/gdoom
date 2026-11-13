@@ -14,6 +14,13 @@ from config import (
 parsed_url = urlparse(GDOC_URL)
 params = parse_qs(parsed_url.query)
 SID = params["sid"][0]
+
+# Test A: strip the expiring token param, keep everything else
+_q = parse_qs(parsed_url.query, keep_blank_values=True)
+_q.pop("token", None)
+GDOC_URL_NO_TOKEN = parsed_url._replace(query=urlencode(_q, doseq=True)).geturl()
+# GDOC_URL_NO_TOKEN = GDOC_URL
+print("using URL:", GDOC_URL_NO_TOKEN[:120], "...")  # sanity check
 # print(SID)
 # print(GDOC_URL)  # gdoc url is stable across allrequests i've tried, seems obvious
 # cookie  isn't stable between requets, but we just hope it works.
@@ -147,7 +154,10 @@ async def main():
 
     async with aiohttp.ClientSession(headers=HEADERS) as session:
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-        current_revision = 10172
+        current_revision = 10446
+        current_state = load_state()
+        current_revision = current_state["revision"]
+
         # todo - load state
 
         with open(JSON_PATH, "r", encoding="utf-8") as f:
@@ -160,9 +170,8 @@ async def main():
 
         timestamp = index / data["fps"]
 
-        STEP = 10
-        delay = STEP / data["fps"]  # 10/30 = 0.333
-
+        STEP = 2
+        delay = STEP / data["fps"]  # 2/30 = 0.0667 = 1/15
         while True:
             # text = "a" * 5000
             frame = frames[index]
@@ -212,33 +221,52 @@ async def main():
 
             raw_command = make_raw_data(current_revision, command, reqId=index)
             async with session.post(
-                GDOC_URL, data=raw_command, headers={"authorization": sapisidhash()}
+                GDOC_URL,
+                data=raw_command,
+                headers={"authorization": sapisidhash()},
             ) as response:
                 print("Status:", response.status)
                 print("Content-type:", response.headers["content-type"])
                 body = await response.text()
                 print(response.headers)
 
-                if response.status == "401":
-                    exit
+                if response.status == 401:
+                    print("\n=== AUTH DEBUG ===")
+                    print(f"sent auth header : {sapisidhash()}")
+                    print(
+                        f"SAPISID cookie   : ...{SAPISID[-8:] if SAPISID else 'MISSING'}"
+                    )
+                    print(
+                        f"cookie total len : {len(HEADERS.get('cookie', HEADERS.get('Cookie', '')))}"
+                    )
+                    print(f"current unix ts  : {int(time.time())}")
+                    print(f"stuck at frame   : {index}")
+                    save_state(index, current_revision)
+                    return
+                    exit()
                 if body.startswith(")]}'"):
                     clean_json = body.lstrip(")]}'\n ")
                 else:
                     clean_json = body
 
                 cleaner_response = json.loads(clean_json)
-                if response.status == 200:
-                    next_rev = cleaner_response["revisionRanges"][0][1]
-                    save_state(index, current_revision)
+                # if response.status == 200:
+                #     next_rev = cleaner_response["revisionRanges"][0][1]
+                #     save_state(index, current_revision + 1)
+
+                print("RAW RESPONSE:", body[:500])
+                print("PARSED:", cleaner_response)
                 print(
                     body
                 )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
             await asyncio.sleep(delay)
             current_revision += 1
+
             index += STEP
 
             if index >= total_frames:
                 index = 0
+            save_state(index, current_revision)
 
 
 asyncio.run(main())
