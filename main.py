@@ -41,24 +41,21 @@ async def main():
 
     async with aiohttp.ClientSession(headers=HEADERS) as session:
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-        current_revision = 31
+        current_revision = 667
         while True:
-            text = """
-            ⣿⠛⠛⠛⠛⠛⠛⠛⠛⣿
-            ⡇⠀⣿⠀⠀⠀⣿⠀⠀⢸
-            ⡇⠀⠀⣿⠀⣿⠀⠀⠀⢸
-            ⣿⣤⣤⣤⣤⣤⣤⣤⣤⣿
-
-            """
+            text = "a" * 5000
             insert_command = make_raw_data(
-                current_revision, [{"ty": "is", "ibi": 3, "s": "y"}]
+                current_revision, [{"ty": "is", "ibi": 3, "s": text}]
             )
             async with session.post(GDOC_URL, data=insert_command) as response:
 
                 print("Status:", response.status)
                 print("Content-type:", response.headers["content-type"])
                 body = await response.text()
-                print(body)
+                print(
+                    body
+                )  # todo: parse this to get the current revision, store in json
+            await asyncio.sleep(1)
             current_revision += 1
 
 

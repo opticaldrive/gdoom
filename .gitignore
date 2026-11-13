@@ -1,2 +1,4 @@
 browser-exports/
 config.py
+*.pyc
+curl-headers-extractor.py
