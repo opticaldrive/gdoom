@@ -30,6 +30,7 @@ def refresh_creds():
     with sync_playwright() as p:
         browser = p.chromium.launch_persistent_context(headless=False, user_data_dir=pw_chromium_profile)
         page = browser.pages[0]
-        page.goto("https://google.com") # probs replace with the gdoc
+        page.goto("https://docs.google.com/document/d/1XGLLyWU_gMP74SiTi8_hT3uFLIHIqaQ-OByqHQ3qG8Q/edit?tab=t.0") # probs replace with the gdoc
         
+
     None
