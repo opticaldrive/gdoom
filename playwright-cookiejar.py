@@ -1,10 +1,14 @@
 from playwright.sync_api import sync_playwright
+import time
 
+pw_chromium_profile = "./cookiejar/pw-profile"
 with sync_playwright() as p:
-    browser = p.chromium.launch()
-    page = browser.new_page()
-    page.goto("https://playwright.dev")
-    print(page.title())
+    browser = p.firefox.launch_persistent_context(headless=False, user_data_dir=pw_chromium_profile)
+    page = browser.pages[0]
+    page.goto("https://google.com")
+    input("press enter when you've put in your creds and navigated to the google doc")
+    # page.pause(10)
+
     browser.close()
 
 def headful_login():
