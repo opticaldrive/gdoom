@@ -250,9 +250,9 @@ async def main():
                     clean_json = body
 
                 cleaner_response = json.loads(clean_json)
-                # if response.status == 200:
-                #     next_rev = cleaner_response["revisionRanges"][0][1]
-                #     save_state(index, current_revision + 1)
+                if response.status == 200:
+                    # next_rev = cleaner_response["revisionRanges"][0][1]
+                    save_state(index, current_revision + 1)
 
                 print("RAW RESPONSE:", body[:500])
                 print("PARSED:", cleaner_response)
