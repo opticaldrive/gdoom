@@ -24,6 +24,9 @@ JSON_PATH = "bad_apple.json"
 
 ORIGIN = f"{urlparse(GDOC_URL).scheme}://{urlparse(GDOC_URL).netloc}"  # idk why not just hardcpde
 
+TARGET_FPS = 20
+period = 1 / TARGET_FPS
+
 
 def save_config(save_request, index=None, rev=None):
     config = load_config() or {}
@@ -215,15 +218,16 @@ async def main():
                     ],
                 }
             ]
-            print(f"Frame: {index} / {total_frames - 1} ({timestamp:.2f}s)")
-            print(
-                f"Background: {'WHITE (black dots)' if frame['white_bg'] else 'BLACK (white dots)'}"
-            )
-            print("-" * data["width"])
-            print(frame["braille"])
-            print("-" * data["width"])
+            # print(f"Frame: {index} / {total_frames - 1} ({timestamp:.2f}s)")
+            # print(
+            #     f"Background: {'WHITE (black dots)' if frame['white_bg'] else 'BLACK (white dots)'}"
+            # )
+            # print("-" * data["width"])
+            # print(frame["braille"])
+            # print("-" * data["width"])
 
             raw_command = make_raw_data(current_revision, command, reqId=index)
+            t0 = time.monotonic()
             async with session.post(
                 GDOC_URL,
                 data=raw_command,
@@ -287,11 +291,13 @@ async def main():
                         rev=current_revision + 1,
                     )
 
-                print("RAW RESPONSE:", body[:500])
-                print("PARSED:", cleaner_response)
-                print(
-                    body
-                )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
+                # print("RAW RESPONSE:", body[:500])
+                # print("PARSED:", cleaner_response)
+                # print(
+                #     body
+                # )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
+            elapsed = time.monotonic() - t0
+            print(f"req took {elapsed*1000:.0f}ms  (target period {period*1000:.0f}ms)")
             await asyncio.sleep(delay)
             current_revision += 1
 
