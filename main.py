@@ -161,7 +161,7 @@ async def main():
         timestamp = index / data["fps"]
 
         STEP = 2
-        delay = STEP / data["fps"]  # 2/30 = 0.0667 = 1/15
+        delay = (STEP / data["fps"]) / 2  # 2/30 = 0.0667 = 1/15
         while True:
             # text = "a" * 5000
             frame = frames[index]
