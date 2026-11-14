@@ -15,16 +15,6 @@ parsed_url = urlparse(GDOC_URL)
 params = parse_qs(parsed_url.query)
 SID = params["sid"][0]
 
-# Test A: strip the expiring token param, keep everything else
-_q = parse_qs(parsed_url.query, keep_blank_values=True)
-_q.pop("token", None)
-GDOC_URL_NO_TOKEN = parsed_url._replace(query=urlencode(_q, doseq=True)).geturl()
-# GDOC_URL_NO_TOKEN = GDOC_URL
-print("using URL:", GDOC_URL_NO_TOKEN[:120], "...")  # sanity check
-# print(SID)
-# print(GDOC_URL)  # gdoc url is stable across allrequests i've tried, seems obvious
-# cookie  isn't stable between requets, but we just hope it works.
-
 STATE_PATH = "state.json"  # im tired of hardocing revisions :p
 # ton of copy pastintg snippets sorry
 
