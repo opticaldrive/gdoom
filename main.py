@@ -2,39 +2,46 @@ import aiohttp
 import asyncio
 import json
 from urllib.parse import urlparse, parse_qs, urlencode
-
+import random
+import hashlib, time
 
 from config import (
     HEADERS,
     GDOC_URL,
 )  # i spent a good 10 minutes hand formatting the curl headers into a python dict. So, you don't get it. jkjk, its cuz there are secrets.
 
-# todo - put it in .env
+
+from playwright_cookiejar import refresh_creds
 
 parsed_url = urlparse(GDOC_URL)
 params = parse_qs(parsed_url.query)
 SID = params["sid"][0]
 
-STATE_PATH = "state.json"  # im tired of hardocing revisions :p
+CONFIG_PATH = "config.json"  # im tired of hardocing revisions :p
 # ton of copy pastintg snippets sorry
 
+JSON_PATH = "bad_apple.json"
 
-def save_state(index, rev):
-    with open(STATE_PATH, "w") as f:
-        json.dump({"index": index, "revision": rev}, f)
+ORIGIN = f"{urlparse(GDOC_URL).scheme}://{urlparse(GDOC_URL).netloc}"  # idk why not just hardcpde
 
 
-def load_state():
+def save_config(save_request, index=None, rev=None):
+    config = load_config() or {}
+    config["save_request"] = save_request
+    if index is not None:
+        config["index"] = index
+    if rev is not None:
+        config["revision"] = rev
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config, f, indent=4)
+
+
+def load_config():
     try:
-        with open(STATE_PATH) as f:
+        with open(CONFIG_PATH) as f:
             return json.load(f)
     except FileNotFoundError:
         return None
-
-
-import hashlib, time
-
-ORIGIN = f"{urlparse(GDOC_URL).scheme}://{urlparse(GDOC_URL).netloc}"  # idk why not just hardcpde
 
 
 def _cookie(name):
@@ -45,6 +52,8 @@ def _cookie(name):
             return v
     return None
 
+
+# this didn't help so i might as well delete it later
 
 SAPISID = _cookie("SAPISID")
 assert SAPISID, "SAPISID cookie not found in HEADERS"
@@ -134,21 +143,26 @@ def make_raw_data(rev, commands, gdoc_url=GDOC_URL, sid=SID, reqId=1):
     return urlencode(data)
 
 
-import json
-import random
-
-JSON_PATH = "bad_apple.json"
-
-
 async def main():
 
-    async with aiohttp.ClientSession(headers=HEADERS) as session:
+    async with aiohttp.ClientSession() as session:  # headers=HEADERS
+        refreshed_creds = await refresh_creds()
+        if refreshed_creds:
+            save_config(save_request=refreshed_creds[-1])
+        else:
+            print("big problem, no refreshed creds")
+            exit()
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
         current_revision = 10446
-        current_state = load_state()
+        current_state = load_config()
         current_revision = current_state["revision"]
 
-        # todo - load state
+        # current_headers=current_state["save_request"]["headers"] - minus everything that starts key with ":" and also get rid of content-length
+        current_headers = {
+            k: v
+            for k, v in current_state["save_request"]["headers"].items()
+            if not k.startswith(":") and k.lower() != "content-length"
+        }
 
         with open(JSON_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -160,7 +174,7 @@ async def main():
 
         timestamp = index / data["fps"]
 
-        STEP = 2
+        STEP = 2  # todo- make itmake more sense
         delay = (STEP / data["fps"]) / 2  # 2/30 = 0.0667 = 1/15
         while True:
             # text = "a" * 5000
@@ -213,7 +227,10 @@ async def main():
             async with session.post(
                 GDOC_URL,
                 data=raw_command,
-                headers={"authorization": sapisidhash()},
+                #     headers={
+                #         "authorization": sapisidhash()
+                #     },  # probs remove content length too, and anything that starts with ":" in the key
+                headers=current_headers,
             ) as response:
                 print("Status:", response.status)
                 print("Content-type:", response.headers["content-type"])
@@ -231,9 +248,31 @@ async def main():
                     )
                     print(f"current unix ts  : {int(time.time())}")
                     print(f"stuck at frame   : {index}")
-                    save_state(index, current_revision)
-                    return
-                    exit()
+                    save_config(
+                        save_request=refreshed_creds[-1],
+                        index=index,
+                        rev=current_revision,
+                    )
+                    refreshed_creds = await refresh_creds()
+                    if refreshed_creds:
+                        save_config(save_request=refreshed_creds[-1])
+                    else:
+                        print("big problem, no refreshed creds")
+                        exit()
+                    # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
+                    current_revision = 10446
+                    current_state = load_config()
+                    current_revision = current_state["revision"]
+
+                    # current_headers=current_state["save_request"]["headers"] - minus everything that starts key with ":" and also get rid of content-length
+                    current_headers = {
+                        k: v
+                        for k, v in current_state["save_request"]["headers"].items()
+                        if not k.startswith(":") and k.lower() != "content-length"
+                    }
+
+                    # return
+                    # exit()
                 if body.startswith(")]}'"):
                     clean_json = body.lstrip(")]}'\n ")
                 else:
@@ -242,7 +281,11 @@ async def main():
                 cleaner_response = json.loads(clean_json)
                 if response.status == 200:
                     # next_rev = cleaner_response["revisionRanges"][0][1]
-                    save_state(index, current_revision + 1)
+                    save_config(
+                        save_request=refreshed_creds[-1],
+                        index=index,
+                        rev=current_revision + 1,
+                    )
 
                 print("RAW RESPONSE:", body[:500])
                 print("PARSED:", cleaner_response)
@@ -256,7 +299,11 @@ async def main():
 
             if index >= total_frames:
                 index = 0
-            save_state(index, current_revision)
+                save_config(
+                    save_request=refreshed_creds[-1],
+                    index=index,
+                    rev=current_revision,
+                )
 
 
 asyncio.run(main())

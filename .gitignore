@@ -4,3 +4,5 @@ config.py
 curl-headers-extractor.py
 videos/
 cookiejar/
+bad_apple.json
+config.json
