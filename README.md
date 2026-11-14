@@ -1,10 +1,14 @@
-Reverse engineering google docs 
+playing with google docs \
 
-as of current state, most of the data is in browser-exports
+raw data data is in browser-exports and in curl-headers-extractor.py\ 
+those have my cookies. \
 
-we have data for several commands:
-"ibi":"is" - insert
-"ibi":"ds" - delete
+we have data for several commands: \
+"ibi":"is" - insert \ 
+"ibi":"ds" - delete \ 
+
+There's also a multi-command thing where you can send multiple commands in one requests \ 
+We use that for bad apple.
 
 We have successfully tested:
 - replaying requests in firefox - simply update the revision id
@@ -16,3 +20,14 @@ What I'm doing next:
 - bad apple
 
 Much is to be done :)
+
+is incomplete, \ 
+
+Bad apple \
+- frames made into braille
+- frame data has note of what color is in the background - black or white
+- when we play it, we set the background of the page to black or white
+- then, we ad the braille text
+- the we set the text's color to the inverse of the background
+- then we try to do that several more times per second
+- download the yt video yourself with yt-dlp - i'm not getting dmcaed for that.
