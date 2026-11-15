@@ -159,14 +159,26 @@ async def main():
         refreshed_creds = await refresh_creds()
         await asyncio.sleep(5)
         if refreshed_creds:
-            save_config(save_request=refreshed_creds[-1])
+            save_req = refreshed_creds[-1]
+            save_config(save_request=save_req)
+
+            browser_rev = parse_rev_from_post_data(save_req["post_data"])
+            if browser_rev is None:
+                print("WARN: couldn't parse rev from captured save")
+            else:
+                print(f"[creds] captured rev={browser_rev} (browser's pre-save rev)")
+                # Use the browser's rev as the starting point.
+                # If browser's save went through, doc is at browser_rev+1 → 550 once, catches up.
+                # If it didn't go through, doc is at browser_rev → first write succeeds immediately.
+                # Both self-correct with the += 1 gate below.
+                current_revision = browser_rev
         else:
             print("big problem, no refreshed creds")
             exit()
         # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-        current_revision = 10446
+        # current_revision = 10446
         current_state = load_config()
-        current_revision = current_state["revision"]
+        # current_revision = current_state["revision"]
 
         # current_headers=current_state["save_request"]["headers"] - minus everything that starts key with ":" and also get rid of content-length
         current_headers = {
@@ -268,16 +280,30 @@ async def main():
                         rev=current_revision,
                     )
                     refreshed_creds = await refresh_creds()
+                    # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
+                    # current_revision = 10446
+                    current_state = load_config()
+                    # current_revision = current_state["revision"]
                     await asyncio.sleep(5)
                     if refreshed_creds:
-                        save_config(save_request=refreshed_creds[-1])
+                        save_req = refreshed_creds[-1]
+                        save_config(save_request=save_req)
+
+                        browser_rev = parse_rev_from_post_data(save_req["post_data"])
+                        if browser_rev is None:
+                            print("WARN: couldn't parse rev from captured save")
+                        else:
+                            print(
+                                f"[creds] captured rev={browser_rev} (browser's pre-save rev)"
+                            )
+                            # Use the browser's rev as the starting point.
+                            # If browser's save went through, doc is at browser_rev+1 → 550 once, catches up.
+                            # If it didn't go through, doc is at browser_rev → first write succeeds immediately.
+                            # Both self-correct with the += 1 gate below.
+                            current_revision = browser_rev
                     else:
                         print("big problem, no refreshed creds")
                         exit()
-                    # you gotta update this every time you run it unfortunately - I haven't found the api route yet, haven't tried. Probs in an init request on doc page load?
-                    current_revision = 10446
-                    current_state = load_config()
-                    current_revision = current_state["revision"]
 
                     # current_headers=current_state["save_request"]["headers"] - minus everything that starts key with ":" and also get rid of content-length
                     current_headers = {
