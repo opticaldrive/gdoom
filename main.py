@@ -10,6 +10,8 @@ from config import (
     GDOC_URL,
 )  # i spent a good 10 minutes hand formatting the curl headers into a python dict. So, you don't get it. jkjk, its cuz there are secrets.
 
+import re
+
 
 from playwright_cookiejar import refresh_creds
 
@@ -26,6 +28,11 @@ ORIGIN = f"{urlparse(GDOC_URL).scheme}://{urlparse(GDOC_URL).netloc}"  # idk why
 
 TARGET_FPS = 20
 period = 1 / TARGET_FPS
+
+
+def parse_rev_from_post_data(post_data: str) -> int | None:
+    m = re.search(r"(?:^|&)rev=(\d+)", post_data)  # i (hope) deepseek did it right
+    return int(m.group(1)) if m else None
 
 
 def save_config(save_request, index=None, rev=None):
@@ -150,6 +157,7 @@ async def main():
 
     async with aiohttp.ClientSession() as session:  # headers=HEADERS
         refreshed_creds = await refresh_creds()
+        await asyncio.sleep(5)
         if refreshed_creds:
             save_config(save_request=refreshed_creds[-1])
         else:
@@ -236,10 +244,12 @@ async def main():
                 #     },  # probs remove content length too, and anything that starts with ":" in the key
                 headers=current_headers,
             ) as response:
-                print("Status:", response.status)
-                print("Content-type:", response.headers["content-type"])
                 body = await response.text()
-                print(response.headers)
+                if response.status != 200:
+                    print("Status:", response.status)
+                    print("Content-type:", response.headers["content-type"])
+
+                    print(response.headers)
 
                 if response.status == 401:
                     print("\n=== AUTH DEBUG ===")
@@ -258,6 +268,7 @@ async def main():
                         rev=current_revision,
                     )
                     refreshed_creds = await refresh_creds()
+                    await asyncio.sleep(5)
                     if refreshed_creds:
                         save_config(save_request=refreshed_creds[-1])
                     else:
@@ -297,7 +308,7 @@ async def main():
                 #     body
                 # )  # todo: parse this to get the current revision, store in json. Could literally just fuzz a couple digits o smt if im bored
             elapsed = time.monotonic() - t0
-            print(f"req took {elapsed*1000:.0f}ms  (target period {period*1000:.0f}ms)")
+            # print(f"req took {elapsed*1000:.0f}ms  (target period {period*1000:.0f}ms)")
             await asyncio.sleep(delay)
             current_revision += 1
 

@@ -9,6 +9,7 @@ from config import GDOC_URL
 from urllib.parse import urlparse
 import sys
 from urllib.parse import parse_qs, urlparse
+import asyncio
 
 parsed = urlparse(GDOC_URL)
 
@@ -87,6 +88,7 @@ def headful_login():
 
 async def refresh_creds():
     undo_shortcut = "Meta+z" if sys.platform == "darwin" else "Control+z"
+    select_all_shortcut = "Meta+a" if sys.platform == "darwin" else "Control+a"
     save_events = []
 
     async def handle_request(req):
@@ -132,8 +134,23 @@ async def refresh_creds():
         # undo the space
         await page.keyboard.press(undo_shortcut)
         await page.wait_for_timeout(1000)  # abnother save
+        await page.keyboard.press(select_all_shortcut)
+        await page.wait_for_timeout(150)
+        await page.keyboard.press("Delete")
+        await page.keyboard.press("ArrowLeft")  # nselect stuff cuz
+        await page.wait_for_timeout(1000)
+        # await browser.close()
+        browser_closed_event = asyncio.Event()
+        browser.on("disconnected", lambda _: browser_closed_event.set())
 
-        await browser.close()
+        close_task = asyncio.create_task(browser.close())
+
+        try:
+            await asyncio.wait_for(browser_closed_event.wait(), timeout=10.0)
+            print("its really dead")
+        except asyncio.TimeoutError:
+            print("Browser hung during close! Forcing teardown...")
+            close_task.cancel()
 
     all_sids = list(dict.fromkeys(e["sid"] for e in save_events if e["sid"]))
     print(f"Captured {len(save_events)} /save requests.")
